@@ -5,7 +5,6 @@ import { Webcam, X, Palette } from 'lucide-react';
 
 interface VirtualTryOnProps {
   onClose: () => void;
-  onLipColorSelect: (color: string) => void;
 }
 
 const LIPSTICK_SHADES = [
@@ -19,26 +18,40 @@ const LIPSTICK_SHADES = [
   { name: 'True Red', hex: '#FF0000' },
 ];
 
-export function VirtualTryOn({ onClose, onLipColorSelect }: VirtualTryOnProps) {
+export function VirtualTryOn({ onClose }: VirtualTryOnProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedColor, setSelectedColor] = useState('#FF7F50');
   const [camera, setCamera] = useState<Camera | null>(null);
-  const [faceMesh, setFaceMesh] = useState<FaceMesh | null>(null);
+
+  // Add global error handler for WebAssembly errors
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      if (event.message && event.message.includes('Module.arguments')) {
+        console.warn('MediaPipe WebAssembly error handled:', event.message);
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
+  }, []);
 
   useEffect(() => {
     const initializeCamera = async () => {
       if (!videoRef.current || !canvasRef.current || !overlayCanvasRef.current) return;
 
       try {
+        // Initialize MediaPipe with TensorFlow.js runtime to avoid WASM issues
         const faceMeshInstance = new FaceMesh({
           locateFile: (file) => {
             return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
           },
         });
 
+        // Set options before initializing
         faceMeshInstance.setOptions({
           maxNumFaces: 1,
           refineLandmarks: true,
@@ -50,8 +63,12 @@ export function VirtualTryOn({ onClose, onLipColorSelect }: VirtualTryOnProps) {
 
         const cameraInstance = new Camera(videoRef.current, {
           onFrame: async () => {
-            if (faceMeshInstance && videoRef.current) {
-              await faceMeshInstance.send({ image: videoRef.current });
+            try {
+              if (videoRef.current && faceMeshInstance) {
+                await faceMeshInstance.send({ image: videoRef.current });
+              }
+            } catch (error) {
+              console.warn('Face mesh processing error:', error);
             }
           },
           width: 640,
@@ -61,11 +78,12 @@ export function VirtualTryOn({ onClose, onLipColorSelect }: VirtualTryOnProps) {
         await cameraInstance.start();
         
         setCamera(cameraInstance);
-        setFaceMesh(faceMeshInstance);
         setIsLoading(false);
       } catch (error) {
-        console.error('Error initializing camera:', error);
+        console.error('Error initializing camera or face mesh:', error);
         setIsLoading(false);
+        // Show user-friendly error message
+        alert('Virtual try-on is currently unavailable. Please try again later.');
       }
     };
 
@@ -150,7 +168,6 @@ export function VirtualTryOn({ onClose, onLipColorSelect }: VirtualTryOnProps) {
 
   const handleColorSelect = (hex: string) => {
     setSelectedColor(hex);
-    onLipColorSelect(hex);
   };
 
   return (

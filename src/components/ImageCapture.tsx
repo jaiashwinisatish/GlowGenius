@@ -58,10 +58,35 @@ export function ImageCapture({ onImageCapture }: ImageCaptureProps) {
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       if (file) {
+        // Validate file type
+        const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+        if (!validTypes.includes(file.type)) {
+          alert('Please upload a JPEG or PNG image file.');
+          return;
+        }
+
+        // Validate file size (max 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+          alert('File size must be less than 10MB.');
+          return;
+        }
+
         const reader = new FileReader();
         reader.onload = (e) => {
-          const imageData = e.target?.result as string;
-          onImageCapture(imageData);
+          try {
+            const imageData = e.target?.result as string;
+            if (imageData && imageData.startsWith('data:image')) {
+              onImageCapture(imageData);
+            } else {
+              throw new Error('Invalid image data');
+            }
+          } catch (error) {
+            console.error('Error processing uploaded image:', error);
+            alert('Failed to process the uploaded image. Please try a different file.');
+          }
+        };
+        reader.onerror = () => {
+          alert('Failed to read the uploaded file. Please try again.');
         };
         reader.readAsDataURL(file);
       }
@@ -94,7 +119,7 @@ export function ImageCapture({ onImageCapture }: ImageCaptureProps) {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/jpg,image/png"
             onChange={handleFileUpload}
             className="hidden"
           />

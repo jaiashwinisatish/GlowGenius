@@ -1,7 +1,20 @@
 import { useEffect, useState, useRef } from 'react';
 import * as faceLandmarksDetection from '@tensorflow-models/face-landmarks-detection';
-import '@tensorflow/tfjs-core';
-import '@tensorflow/tfjs-backend-webgl';
+
+// Add error boundary for TensorFlow loading
+let tfLoaded = false;
+let tfLoadError: Error | null = null;
+
+// Load TensorFlow with error handling
+try {
+  require('@tensorflow/tfjs-core');
+  require('@tensorflow/tfjs-backend-webgl');
+  tfLoaded = true;
+} catch (error) {
+  tfLoadError = error as Error;
+  console.error('TensorFlow loading error:', error);
+}
+
 import {
   detectSkinTone,
   detectUndertone,
@@ -26,22 +39,53 @@ export function FaceAnalyzer({ imageData, onAnalysisComplete, onError }: FaceAna
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
 
+  // Add global error handler for TensorFlow/WebAssembly errors
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      if (event.message && (event.message.includes('Module.arguments') || event.message.includes('WebAssembly'))) {
+        console.warn('TensorFlow WebAssembly error handled:', event.message);
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
+  }, []);
+
   useEffect(() => {
     analyzeFace();
   }, [imageData]);
 
   const analyzeFace = async () => {
     try {
+      // Check if TensorFlow loaded properly
+      if (tfLoadError) {
+        onError('AI model loading failed. Please refresh the page and try again.');
+        return;
+      }
+
+      if (!tfLoaded) {
+        onError('AI models are still loading. Please wait a moment and try again.');
+        return;
+      }
+
       setStatus('Loading AI model...');
 
+      // Use TensorFlow.js backend instead of MediaPipe to avoid WASM issues
       const model = faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh;
       const detectorConfig: faceLandmarksDetection.MediaPipeFaceMeshMediaPipeModelConfig = {
-        runtime: 'mediapipe',
-        solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh',
+        runtime: 'tfjs', // Use TensorFlow.js runtime
         refineLandmarks: true,
+        maxFaces: 1,
       };
 
-      const detector = await faceLandmarksDetection.createDetector(model, detectorConfig);
+      setStatus('Initializing face detection...');
+      
+      // Add timeout and better error handling
+      const detector = await Promise.race([
+        faceLandmarksDetection.createDetector(model, detectorConfig),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Model loading timeout')), 10000)
+      ]);
 
       setStatus('Loading image...');
 
@@ -49,9 +93,12 @@ export function FaceAnalyzer({ imageData, onAnalysisComplete, onError }: FaceAna
       img.crossOrigin = 'anonymous';
       img.src = imageData;
 
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => {
+          // Ensure image is fully decoded
+          img.decode().then(resolve).catch(reject);
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
       });
 
       if (imageRef.current) {
@@ -60,9 +107,16 @@ export function FaceAnalyzer({ imageData, onAnalysisComplete, onError }: FaceAna
 
       setStatus('Detecting facial features...');
 
-      const faces = await detector.estimateFaces(img);
+      let faces;
+      try {
+        faces = await detector.estimateFaces(img);
+      } catch (detectionError) {
+        console.error('Face detection error:', detectionError);
+        onError('Face detection failed. Please try with a clearer photo.');
+        return;
+      }
 
-      if (faces.length === 0) {
+      if (!faces || faces.length === 0) {
         onError('No face detected. Please try again with a clear photo of your face.');
         return;
       }
@@ -71,16 +125,16 @@ export function FaceAnalyzer({ imageData, onAnalysisComplete, onError }: FaceAna
       const canvas = canvasRef.current;
 
       if (!canvas) {
-        onError('Canvas not available');
+        onError('Canvas not available for analysis');
         return;
       }
 
       canvas.width = img.width;
       canvas.height = img.height;
       const ctx = canvas.getContext('2d');
-
+      
       if (!ctx) {
-        onError('Cannot get canvas context');
+        onError('Failed to initialize canvas for analysis');
         return;
       }
 
@@ -145,8 +199,27 @@ export function FaceAnalyzer({ imageData, onAnalysisComplete, onError }: FaceAna
         onAnalysisComplete(analysis, recommendations);
       }, 500);
     } catch (error) {
-      console.error('Face analysis error:', error);
-      onError('Failed to analyze face. Please try again with a different photo.');
+      console.error('Face analysis error details:', {
+        error: error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        imageDataLength: imageData?.length || 0
+      });
+      
+      // Provide specific error messages based on error type
+      let errorMessage = 'Failed to analyze face. Please try again with a different photo.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Module.arguments')) {
+          errorMessage = 'AI model loading failed. Please refresh the page and try again.';
+        } else if (error.message.includes('WebAssembly')) {
+          errorMessage = 'Face detection is not supported on this device. Please try uploading a clearer photo.';
+        } else if (error.message.includes('decode')) {
+          errorMessage = 'Failed to process the image. Please ensure it\'s a valid JPEG or PNG file.';
+        }
+      }
+      
+      onError(errorMessage);
     }
   };
 

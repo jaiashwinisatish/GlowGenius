@@ -13,6 +13,8 @@ export interface LipstickRecommendation {
   hex: string;
   description: string;
   category: string;
+  brand?: string;
+  price?: string;
 }
 
 export interface DressColorRecommendation {
@@ -51,7 +53,7 @@ export function generateRecommendations(analysis: BeautyAnalysis): Recommendatio
 }
 
 function getLipstickRecommendations(analysis: BeautyAnalysis): LipstickRecommendation[] {
-  const { skinTone, undertone } = analysis;
+  const { undertone } = analysis;
   const recommendations: LipstickRecommendation[] = [];
 
   if (undertone === 'warm') {
@@ -61,30 +63,40 @@ function getLipstickRecommendations(analysis: BeautyAnalysis): LipstickRecommend
         hex: '#FF7F50',
         description: 'Vibrant coral shade perfect for warm undertones',
         category: 'Everyday',
+        brand: 'MAC',
+        price: '₹1,200',
       },
       {
         name: 'Peach Dream',
         hex: '#FFDAB9',
         description: 'Soft peachy nude that complements your natural warmth',
         category: 'Nude',
+        brand: 'Maybelline',
+        price: '₹600',
       },
       {
         name: 'Warm Red',
         hex: '#DC143C',
         description: 'Classic red with orange undertones for a bold look',
         category: 'Bold',
+        brand: 'Lakmé',
+        price: '₹800',
       },
       {
         name: 'Terracotta Rose',
         hex: '#CD5C5C',
         description: 'Earthy rose shade that enhances warm skin tones',
         category: 'Everyday',
+        brand: 'Revlon',
+        price: '₹900',
       },
       {
         name: 'Golden Bronze',
         hex: '#B87333',
         description: 'Bronzy nude with golden shimmer',
         category: 'Evening',
+        brand: 'Sugar',
+        price: '₹650',
       }
     );
   } else if (undertone === 'cool') {
@@ -294,7 +306,7 @@ function getMakeupStyleRecommendations(analysis: BeautyAnalysis): MakeupStyleRec
 }
 
 function getAccessoryRecommendations(analysis: BeautyAnalysis): AccessoryRecommendation[] {
-  const { skinTone, undertone } = analysis;
+  const { undertone } = analysis;
   const recommendations: AccessoryRecommendation[] = [];
 
   if (undertone === 'warm') {

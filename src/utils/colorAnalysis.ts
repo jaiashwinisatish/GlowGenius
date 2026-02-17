@@ -54,8 +54,6 @@ export function detectSkinTone(rgb: RGB): 'fair' | 'wheatish' | 'dark' {
 }
 
 export function detectUndertone(rgb: RGB): 'warm' | 'cool' | 'neutral' {
-  const hsl = rgbToHsl(rgb);
-
   const rMinusB = rgb.r - rgb.b;
   const gMinusB = rgb.g - rgb.b;
 
