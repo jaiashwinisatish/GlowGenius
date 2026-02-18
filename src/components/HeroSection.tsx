@@ -40,9 +40,42 @@ export function FeatureCard({ icon, title, description, delay }: FeatureCardProp
 
 export function HeroSection() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden">
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      {/* Simple Video Test */}
+      <video
+        className="absolute inset-0 w-full h-full object-cover z-0"
+        src="./hero-bg.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="auto"
+        onLoadStart={() => console.log('Video load started')}
+        onCanPlay={() => console.log('Video can play')}
+        onPlay={() => console.log('Video is playing')}
+        onError={(e) => console.error('Video error:', e)}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          zIndex: 0,
+          backgroundColor: '#000'
+        }}
+      />
+      
+      {/* Debug Info */}
+      <div className="absolute top-4 left-4 bg-white/90 p-2 rounded z-30 text-xs">
+        Testing video: ./hero-bg.mp4
+      </div>
+      
+      {/* Dark Overlay */}
+      <div className="absolute inset-0 bg-black/40 z-10"></div>
+      
+      {/* 4. ANIMATED ELEMENTS - z-10 */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-10">
         <motion.div
           animate={{
             rotate: [0, 360],
@@ -69,7 +102,8 @@ export function HeroSection() {
         />
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      {/* 5. CONTENT - z-20 */}
+      <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -83,13 +117,11 @@ export function HeroSection() {
             </span>
           </div>
           
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6">
-            <span className="bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
-              GlowGenius
-            </span>
+          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6 text-white">
+            GlowGenius
           </h1>
           
-          <p className="text-xl sm:text-2xl text-gray-600 dark:text-gray-400 mb-8 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-xl sm:text-2xl text-white/90 mb-8 max-w-3xl mx-auto leading-relaxed">
             Discover your perfect beauty recommendations with advanced AI analysis. 
             From skin tone detection to virtual try-on, experience beauty tech reimagined.
           </p>
@@ -106,7 +138,7 @@ export function HeroSection() {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="px-8 py-4 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl border border-white/20 dark:border-gray-700/20 text-gray-700 dark:text-gray-300 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+              className="px-8 py-4 bg-white/20 backdrop-blur-xl border border-white/30 text-white rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
             >
               Watch Demo
             </motion.button>

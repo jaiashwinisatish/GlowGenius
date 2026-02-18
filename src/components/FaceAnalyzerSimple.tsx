@@ -56,7 +56,7 @@ export function FaceAnalyzer({ imageData, onAnalysisComplete, onError }: FaceAna
 
       canvas.width = img.width;
       canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
       
       if (!ctx) {
         onError('Failed to initialize canvas for analysis');

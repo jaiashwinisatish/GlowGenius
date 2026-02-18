@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Camera, X, Palette, Download, Share2, SlidersHorizontal, Eye, EyeOff } from 'lucide-react';
-import { FaceMesh } from '@mediapipe/face_mesh';
-import { Camera as MediaPipeCamera } from '@mediapipe/camera_utils';
 
 interface LipColor {
   name: string;
@@ -31,11 +29,14 @@ export function VirtualTryOn({ onClose }: VirtualTryOnProps) {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [showOverlay, setShowOverlay] = useState(true);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const comparisonCanvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   const initializeCamera = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current || !overlayCanvasRef.current) return;
@@ -53,6 +54,8 @@ export function VirtualTryOn({ onClose }: VirtualTryOnProps) {
         audio: false
       });
 
+      streamRef.current = stream;
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         
@@ -63,47 +66,18 @@ export function VirtualTryOn({ onClose }: VirtualTryOnProps) {
           }
         });
 
+        // Set canvas dimensions
+        if (canvasRef.current && overlayCanvasRef.current) {
+          canvasRef.current.width = 640;
+          canvasRef.current.height = 480;
+          overlayCanvasRef.current.width = 640;
+          overlayCanvasRef.current.height = 480;
+        }
+
         setIsCameraActive(true);
         
-        // Initialize MediaPipe Face Mesh after video is ready
-        const faceMesh = new FaceMesh({
-          locateFile: (file) => {
-            return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
-          },
-        });
-
-        faceMesh.setOptions({
-          maxNumFaces: 1,
-          refineLandmarks: true,
-          minDetectionConfidence: 0.5,
-          minTrackingConfidence: 0.5,
-        });
-
-        faceMesh.onResults((results) => {
-          if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-            drawLipOverlay(results.multiFaceLandmarks[0]);
-          } else {
-            // Clear overlay if no face detected
-            const canvas = overlayCanvasRef.current;
-            const ctx = canvas?.getContext('2d');
-            if (ctx && canvas) {
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-            }
-          }
-        });
-
-        // Start MediaPipe camera processing
-        const camera = new MediaPipeCamera(videoRef.current, {
-          onFrame: async () => {
-            if (videoRef.current && faceMesh) {
-              await faceMesh.send({ image: videoRef.current });
-            }
-          },
-          width: 640,
-          height: 480,
-        });
-
-        await camera.start();
+        // Start drawing loop
+        startDrawingLoop();
       }
     } catch (error) {
       console.error('Error initializing camera:', error);
@@ -127,50 +101,74 @@ export function VirtualTryOn({ onClose }: VirtualTryOnProps) {
     }
   }, []);
 
-  const drawLipOverlay = (landmarks: any[]) => {
+  const drawLipOverlay = useCallback(() => {
     const canvas = overlayCanvasRef.current;
     const ctx = canvas?.getContext('2d');
     
-    if (!ctx || !canvas) return;
+    if (!ctx || !canvas || !showOverlay) return;
 
+    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Lip landmarks indices (simplified for demo)
-    const lipLandmarks = [
-      61, 84, 17, 314, 405, 291, 375, 321, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95,
-      78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308
-    ];
 
+    // Set transparency
     ctx.globalAlpha = opacity;
-    ctx.fillStyle = selectedColor.hex;
-    ctx.strokeStyle = selectedColor.hex;
-    ctx.lineWidth = 3;
-
-    // Draw lip shape
-    ctx.beginPath();
-    lipLandmarks.forEach((index, i) => {
-      const landmark = landmarks[index];
-      const x = landmark.x * canvas.width;
-      const y = landmark.y * canvas.height;
-      
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-    });
     
-    ctx.closePath();
+    // Draw simplified lip shape (centered oval)
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2 + 50; // Move down slightly for lip position
+    const lipWidth = 120;
+    const lipHeight = 40;
+
+    // Create gradient for more realistic look
+    const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, lipWidth/2);
+    gradient.addColorStop(0, selectedColor.hex);
+    gradient.addColorStop(0.7, selectedColor.hex);
+    gradient.addColorStop(1, selectedColor.hex + '88'); // Add transparency at edges
+
+    ctx.fillStyle = gradient;
+    
+    // Draw upper lip
+    ctx.beginPath();
+    ctx.ellipse(centerX, centerY - 10, lipWidth/2, lipHeight/2, 0, 0, Math.PI * 2);
     ctx.fill();
+    
+    // Draw lower lip
+    ctx.beginPath();
+    ctx.ellipse(centerX, centerY + 10, lipWidth/2, lipHeight/2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Reset alpha
     ctx.globalAlpha = 1;
+  }, [selectedColor, opacity, showOverlay]);
+
+  const startDrawingLoop = () => {
+    const draw = () => {
+      drawLipOverlay();
+      animationFrameRef.current = requestAnimationFrame(draw);
+    };
+    draw();
+  };
+
+  const stopDrawingLoop = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
   };
 
   const stopCamera = useCallback(() => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      setIsCameraActive(false);
+    stopDrawingLoop();
+    
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
     }
+    
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    
+    setIsCameraActive(false);
   }, []);
 
   const captureImage = () => {
@@ -230,6 +228,13 @@ export function VirtualTryOn({ onClose }: VirtualTryOnProps) {
       stopCamera();
     };
   }, [stopCamera]);
+
+  useEffect(() => {
+    // Redraw when color or opacity changes
+    if (isCameraActive) {
+      drawLipOverlay();
+    }
+  }, [selectedColor, opacity, isCameraActive, drawLipOverlay]);
 
   return (
     <motion.div
@@ -291,6 +296,11 @@ export function VirtualTryOn({ onClose }: VirtualTryOnProps) {
                   className="absolute inset-0 w-full h-full object-cover"
                   autoPlay
                   playsInline
+                  muted
+                />
+                <canvas
+                  ref={overlayCanvasRef}
+                  className="absolute inset-0 w-full h-full object-cover pointer-events-none"
                 />
                 <canvas
                   ref={canvasRef}
@@ -298,45 +308,13 @@ export function VirtualTryOn({ onClose }: VirtualTryOnProps) {
                   width={640}
                   height={480}
                 />
-                <canvas
-                  ref={overlayCanvasRef}
-                  className="absolute inset-0 w-full h-full object-cover"
-                  width={640}
-                  height={480}
-                />
                 
-                {/* Comparison Slider */}
-                <AnimatePresence>
-                  {showComparison && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute inset-0 flex"
-                    >
-                      <div className="w-1/2 relative">
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                          <span className="text-white font-semibold">Before</span>
-                        </div>
-                      </div>
-                      <div className="w-1/2 relative">
-                        <canvas
-                          ref={comparisonCanvasRef}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          width={640}
-                          height={480}
-                        />
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                          <span className="text-white font-semibold">After</span>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </>
-            )}
-          </div>
-
+                {/* Overlay Toggle */}
+                <div className="absolute top-4 left-4">
+                  <button
+                    onClick={() => setShowOverlay(!showOverlay)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                      showOverlay
           {/* Controls Panel */}
           <AnimatePresence>
             {showControls && (
@@ -424,7 +402,8 @@ export function VirtualTryOn({ onClose }: VirtualTryOnProps) {
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       onClick={downloadImage}
-                      className="px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-medium hover:from-green-600 hover:to-emerald-600 transition-all flex items-center justify-center gap-2"
+                      disabled={!isCameraActive}
+                      className="px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-medium hover:from-green-600 hover:to-emerald-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       <Download className="w-4 h-4" />
                       Save
@@ -432,7 +411,8 @@ export function VirtualTryOn({ onClose }: VirtualTryOnProps) {
                     
                     <button
                       onClick={shareImage}
-                      className="px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 transition-all flex items-center justify-center gap-2"
+                      disabled={!isCameraActive}
+                      className="px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       <Share2 className="w-4 h-4" />
                       Share

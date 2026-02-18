@@ -4,10 +4,10 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { ImageCapture } from './components/ImageCapture';
 import { FaceAnalyzer } from './components/FaceAnalyzerSimple';
 import { ResultsDisplayEnhanced } from './components/ResultsDisplayEnhanced';
-import { VirtualTryOn } from './components/VirtualTryOnEnhanced';
-import { AIExplain } from './components/AIExplain';
+import { VirtualTryOn } from './components/VirtualTryOnWorking';
+import { AIExplainEnhanced } from './components/AIExplainEnhanced';
 import { OccasionMode } from './components/OccasionMode';
-import { BudgetMode } from './components/BudgetMode';
+import { BudgetModeEnhanced } from './components/BudgetModeEnhanced';
 import { Header } from './components/Header';
 import { AuthModal } from './components/AuthModal';
 import { HeroSection } from './components/HeroSection';
@@ -194,7 +194,7 @@ function AppContent() {
               </button>
             </div>
             <div className="p-6">
-              <AIExplain analysis={analysis} />
+              <AIExplainEnhanced analysis={analysis} />
             </div>
           </div>
         </div>
@@ -224,7 +224,7 @@ function AppContent() {
       
       {featureMode === 'budget' && analysis && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-auto">
             <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Budget Mode</h2>
               <button
@@ -235,7 +235,7 @@ function AppContent() {
               </button>
             </div>
             <div className="p-6">
-              <BudgetMode
+              <BudgetModeEnhanced
                 analysis={analysis}
                 onRecommendationsUpdate={handleRecommendationsUpdate}
               />
