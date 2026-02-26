@@ -1,4 +1,4 @@
-# GlowGenius AI Beauty Assistant
+# GlowGenius AI Beauty Assistant...
 
 An advanced AI-powered beauty analysis platform that provides personalized makeup and fashion recommendations using cutting-edge computer vision and machine learning technologies.
 
